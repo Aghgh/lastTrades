@@ -2,20 +2,21 @@
     <head>
         <script src="getLatestBigTrades.js"></script> 
         <style>
-            div {
-                min-height: 0.5em;
+            pre {
+                /*min-height: 0.5em;*/
+                max-width: 90vw;
+                white-space: break-spaces;
+                word-wrap: anywhere;
             }
-
             body {
                 font-family: Consolas;
             }
+            html {  font-size: 1.5rem;}
         </style>
     </head>
-
     <body>
-        <button id="btn" style="font-weight: bold; font-size: 16px;">Refresh!</button>
+        <button id="btn" style="margin: 16px; min-height:30px; font-weight: bold; font-size: 16px;">Refresh!</button>
         <div id="output">
-
         </div>
     </body>
 </html>
