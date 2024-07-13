@@ -1,12 +1,13 @@
 <html>
     <head>
-        <script src="getLatestBigTrades.js"></script> 
+        <script src="getLatestBigTrades.js" defer></script> 
         <style>
             pre {
                 /*min-height: 0.5em;*/
                 max-width: 90vw;
                 white-space: break-spaces;
                 word-wrap: anywhere;
+                margin: 0.2em;
             }
             body {
                 font-family: Consolas;
@@ -15,8 +16,8 @@
         </style>
     </head>
     <body>
-        <button id="btn" style="margin: 16px; min-height:30px; font-weight: bold; font-size: 16px;">Refresh!</button>
         <div id="output">
         </div>
+        <button id="btn" style="margin: 16px; padding:0.5rem; font-weight: bold; font-size: 2rem;">Reload!</button>
     </body>
 </html>
