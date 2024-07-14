@@ -68,11 +68,6 @@ async function main() {
     document.querySelector('#output').appendChild(newNode)
   }
 
-  function refresh() {
-    document.querySelector('#output').innerHTML = "";
-    main();
-  }
-
   function collectStats(bets) {
     let stats = {
       "amount >=500:": bets.filter(x => (x._absAmount) >= 500).length,
@@ -143,23 +138,27 @@ async function main() {
   }
 
   globalThis.marketCache = globalThis.marketCache || {}
-  async function outputBetAndMarketInfo(bet) {
-    let id = bet.contractId
+  async function loadMarket(contractId) {
     let market;
-    if (marketCache[id]) {
-      market = marketCache[id]; // save on API-Calls
+    if (marketCache[contractId]) {
+      market = marketCache[contractId]; // save on API-Calls
     } else {
-      let response2 = await fetch("https://api.manifold.markets/v0/market/" + id, { method: "GET" })
+      let response2 = await fetch("https://api.manifold.markets/v0/market/" + contractId, { method: "GET" })
       market = await response2.json();
-      marketCache[id] = market;
+      marketCache[contractId] = market;
     }
+    return market;
+  }
+
+  async function outputBetAndMarketInfo(bet) {
+    let market = await loadMarket(bet.contractId);
 
     let realcurrentProb = market.probability && roundTo2(market.probability * 100);
     if (bet.answerId) {
       realcurrentProb = roundTo2(market.answers?.find(a => a.id === bet.answerId)?.probability * 100)
     }
     let answer = bet.answerId ? (market.answers?.find(a => a.id == bet.answerId)?.text) : bet.outcome
-    outputLink(market.url, market.question + " (" + answer + ") " + market.uniqueBettorCount)
+    outputLink(market.url, market.question + " (" + answer + ") ")
 
     if (market.isResolved) {
       outputBold("TOO LATE! market resolved!")
@@ -172,7 +171,7 @@ async function main() {
         realcurrentProb)//, " (_movement:",roundTo2(Math.abs(realcurrentProb-bet.probBefore)),")")
     }
     if (market.uniqueBettorCount <= 10) {
-      outputBold(market.uniqueBettorCount <= 5 ? "VERY" : "", "new market!")
+      outputBold("low Trader count market ("+ market.uniqueBettorCount+")!")
     }
 
     output("amount: ", Math.round(bet._absAmount) + (bet._isSold ? "(sell)" : ""),
@@ -181,75 +180,84 @@ async function main() {
       (bet._ageInMinutes <= 1) ? "" : (" [placed " + bet._ageInMinutes + " minutes ago]"))
     console.log("user: ", bet.userName || bet.userUsername || bet.userId)
 
-    console.log(bet.contractId);
+    console.log("marketId",bet.contractId);
     output(" ");
   }
 
   // START
-  let response = await fetch("https://api.manifold.markets/v0/bets?order=desc&limit=" + betCount, { method: "GET" })
-  let bets = await response.json();
-  output("oldest   Bet:", new Date(bets[bets.length - 1].createdTime).toLocaleTimeString())
-  output("youngest Bet:", new Date(bets[0].createdTime).toLocaleTimeString())
+  try {
+    if (globalThis.document?.querySelector('#output')) {
+      document.querySelector('#output').innerHTML = "";
+    }
+    let bets = [];
+    const response = await fetch("https://api.manifold.markets/v0/bets?order=desc&limit=" + betCount, { method: "GET" })
+    bets = await response.json();
 
-  for (let bet of bets) {
-    // precalc some stuff 
-    bet._isSold = bet.amount < 0;
-    bet._unroundeProb = bet.probBefore
-    bet._ageInMinutes = Math.floor((new Date() - bet.createdTime) / 1000 / 60)
-    bet._absAmount = Math.abs(bet.amount)
-    bet._probAfter = roundTo2(bet.probAfter * 100);
-    bet._probBefore = roundTo2(bet.probBefore * 100);
-    bet._movement = Math.abs(roundTo2((bet._probAfter - bet._probBefore) * 100))
+    output("oldest   Bet:", new Date(bets[bets.length - 1].createdTime).toLocaleTimeString())
+    output("youngest Bet:", new Date(bets[0].createdTime).toLocaleTimeString())
 
+    for (let bet of bets) {
+      // precalc some stuff 
+      bet._isSold = bet.amount < 0;
+      bet._unroundeProb = bet.probBefore
+      bet._ageInMinutes = Math.floor((new Date() - bet.createdTime) / 1000 / 60)
+      bet._absAmount = Math.abs(bet.amount)
+      bet._probAfter = roundTo2(bet.probAfter * 100);
+      bet._probBefore = roundTo2(bet.probBefore * 100);
+      bet._movement = Math.abs(roundTo2((bet._probAfter - bet._probBefore) * 100))
+
+    }
+    collectStats(bets);
+
+    bets = bets.filter(bet => bet._absAmount !== 0);
+    console.log("filtered out " + (betCount - bets.length) + " nothing bets")
+    let newCount = bets.length
+    //let bets2 = mergeConsecutiveBets(bets);
+    //output("bets merged "+(newCount - bets2.length));
+    bets = mergeConsecutiveBets(bets.reverse());
+    console.log("bets merged " + (newCount - bets.length));
+
+
+    for (let bet of bets) {
+      bet._movement = Math.abs(roundTo2((bet._probAfter - bet._probBefore) * 100))
+      bet._probAfter = roundTo2(bet.probAfter * 100);
+      bet._absAmount = Math.abs(bet.amount)
+      bet._significance = rateBet(bet);
+    }
+
+
+    bets = bets.sort((a, b) => b._significance - a._significance);
+
+    let mostSignificantBet = bets[0]; // biggest bet by _significance
+
+    bets = bets.filter(bt => bt._significance > interestingBetTreshold)
+
+    collectStats(bets);
+
+    let topX = (betCount > 100 || bets.length >= 6) ? 5 : 3
+    if ((betCount == 1000 && bets.length >= 10) || bets.length >= 15) { topX = 8 };
+
+    output("noteworthy bets count:", bets.length, "(out of " + betCount + " total)")
+    if (bets.length == 0) {
+      output(betToString(mostSignificantBet));
+      outputBold("only boring bets! most significant bet:")
+      bets = [mostSignificantBet]
+    } else {
+      output("TOP " + topX + " bets:")
+    }
+
+    bets = bets.slice(0, topX);
+    
+    const marketsToLoad = Array.from(new Set(bets.map(b =>b.contractId)))
+    await Promise.all(marketsToLoad.map(id=>loadMarket(id)));
+    for (let bet of bets) {
+      await outputBetAndMarketInfo(bet);
+    }
+    //output(JSON.stringify(mostSignificantBet,null,2))
+  } catch (e) {
+    output(e);
+    return;
   }
-  collectStats(bets);
-
-  bets = bets.filter(bet => bet._absAmount !== 0);
-  console.log("filtered out " + (betCount - bets.length) + " nothing bets")
-  let newCount = bets.length
-  //let bets2 = mergeConsecutiveBets(bets);
-  //output("bets merged "+(newCount - bets2.length));
-  bets = mergeConsecutiveBets(bets.reverse());
-  console.log("bets merged " + (newCount - bets.length));
-
-
-  for (let bet of bets) {
-    bet._movement = Math.abs(roundTo2((bet._probAfter - bet._probBefore) * 100))
-    bet._probAfter = roundTo2(bet.probAfter * 100);
-    bet._absAmount = Math.abs(bet.amount)
-    bet._significance = rateBet(bet);
-  }
-
-
-  bets = bets.sort((a, b) => b._significance - a._significance);
-
-  let mostSignificantBet = bets[0]; // biggest bet by _significance
-
-  bets = bets.filter(bt => bt._significance > interestingBetTreshold)
-
-  collectStats(bets);
-
-  let topX = (betCount > 100 || bets.length >= 6) ? 5 : 3
-  if ((betCount == 1000 && bets.length >= 10) || bets.length >= 15) { topX = 8 };
-
-  output("noteworthy bets count:", bets.length, "(out of " + betCount + " total)")
-  if (bets.length == 0) {
-    output(betToString(mostSignificantBet));
-    outputBold("only boring bets! most significant bet:")
-    bets = [mostSignificantBet]
-  } else {
-    output("TOP " + topX + " bets:")
-  }
-
-  bets = bets.slice(0, topX);//.reverse();
-  for (let bet of bets) {
-    await outputBetAndMarketInfo(bet);
-    //if (bet.mergeInfo){ outputBold(bet.mergeInfo)}
-  }
-  //output(JSON.stringify(mostSignificantBet,null,2))
 }
-//setTimeout(()=>{
 globalThis.document?.getElementById("btn")?.addEventListener("click", () => { main() });
 setTimeout(() => main())
-//})
-//main();
