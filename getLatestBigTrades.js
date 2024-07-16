@@ -3,13 +3,12 @@ async function main() {
 
   // bots, sports-bettors, etc.
   let ignoreUsers = ["FDWTsTHFytZz96xmcKzf7S5asYL2", "qnIAzz9RamaodeiJSiGZO6xRGC63" // Yuna , Agh
-    , "tRZZ6ihugZQLXPf6aPRneGpWLmz1", "sTUV8ejuM2byukNZp7qKP2OKXMx2",  // manifoldLove, NFL Unofficial
-    "Iiok8KHMCRfUiwtMq1tl5PeDbA73", "EJQOCF3MfLTFYbhiKncrNefQDBz1"]; // Lion, Chris Billingto
+    ,"Iiok8KHMCRfUiwtMq1tl5PeDbA73", "EJQOCF3MfLTFYbhiKncrNefQDBz1"]; // Lion, Chris Billingto
   // users where you are less likely to benefit from correcting their trades (e.g. good users, news-traders, bots)
   let lessInterestingUsers = ["ilJdhpLzZZSUgzueJOs2cbRnJn82", "SqOJYkeySMQjqP3UAypw6DxPx4Z2",// Botlab, Shump
     "BhNkw088bMNwIFF2Aq5Gg9NTPzz1", "BgCeVUcOzkexeJpSPRNomWQaQaD3", "xB6IgHFizCHEJwqZ3un3", // acc, SemioticRivalry, mattyB
-    "JlVpsgzLsbOUT4pajswVMr0ZzmM2", "EJQOCF3MfLTFYbhiKncrNefQDBz1"]; // joshua, chrisjbillington
-  let uninterestingMarkets = ["vKZUxybbx1OnaklIO5CN", // Who will be the Republican nominee for vice presiden
+    "JlVpsgzLsbOUT4pajswVMr0ZzmM2", "EJQOCF3MfLTFYbhiKncrNefQDBz1", "sTUV8ejuM2byukNZp7qKP2OKXMx2"]; // joshua, chrisjbillington, NFL Unofficial
+  let uninterestingMarkets = [
     "GPQrtguru1sg9kGPg3i4", //China housing/real estate crisis by Sep 2024
     "z82v2ijIbM8AFL7jSIvm", // PEPE stock
     "UQIVR5EPgi2JSmHoWB5C", "0oJucOh5KnlC6EM0oql2"]; // uefa-euro-cup-2024-tournament-prop
@@ -32,6 +31,11 @@ async function main() {
     rating -= bet._ageInMinutes / 60;
     if (bet._ageInMinutes <= 2) { rating += 0.2 }
     if (bet.answerId) { rating -= 0.3; } // personal dislike for multi-choice markets.
+    let cachedMarket = globalThis.marketCache[bet.contractId];
+    if (cachedMarket) {
+      rating-=0.3; //slightly prefer markets I haven't seen before
+      if (cachedMarket.isResolved) rating-=5;
+    }
 
     return rating;
   }
@@ -85,6 +89,7 @@ async function main() {
       "meh Users    ": bets.filter(x => lessInterestingUsers.includes(x.userId)).length,
       "ignoreUsers  ": bets.filter(x => ignoreUsers.includes(x.userId)).length,
       "multi-Market ": bets.filter(x => x.answerId).length,
+      "repeat-Market": bets.filter(x => globalThis.marketCache[x.contractId] != null).length,
       "mergedBet    ": bets.filter(x => x.mergeInfo).length,
     }
 
@@ -177,7 +182,7 @@ async function main() {
     output("amount: ", Math.round(bet._absAmount) + (bet._isSold ? "(sell)" : ""),
       " significance:", roundTo2(bet._significance),)
     output("prob:   ", (bet._probBefore), " -> ", (bet._probAfter),
-      (bet._ageInMinutes <= 1) ? "" : (" [placed " + bet._ageInMinutes + " minutes ago]"))
+      (bet._ageInMinutes <= 4) ? "" : (" [placed " + bet._ageInMinutes + " minutes ago]"))
     console.log("user: ", bet.userName || bet.userUsername || bet.userId)
 
     console.log("marketId",bet.contractId);
