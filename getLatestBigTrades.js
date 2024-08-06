@@ -1,5 +1,5 @@
 async function main() {
-  let betCount = 500;
+  let betCount = 400;
 
   // bots, sports-bettors, etc.
   let ignoreUsers = ["FDWTsTHFytZz96xmcKzf7S5asYL2", "qnIAzz9RamaodeiJSiGZO6xRGC63" // Yuna , Agh
@@ -10,7 +10,7 @@ async function main() {
     "JlVpsgzLsbOUT4pajswVMr0ZzmM2", "EJQOCF3MfLTFYbhiKncrNefQDBz1", "sTUV8ejuM2byukNZp7qKP2OKXMx2"]; // joshua, chrisjbillington, NFL Unofficial
   let uninterestingMarkets = [
     "GPQrtguru1sg9kGPg3i4", //China housing/real estate crisis by Sep 2024
-    "z82v2ijIbM8AFL7jSIvm", // PEPE stock
+    "z82v2ijIbM8AFL7jSIvm","GJJKNNWUw5lYK59EGDbT", // PEPE stock, Kizaru Stock
     "UQIVR5EPgi2JSmHoWB5C", "0oJucOh5KnlC6EM0oql2"]; // uefa-euro-cup-2024-tournament-prop
 
   let interestingBetTreshold = 1.8;
@@ -34,7 +34,9 @@ async function main() {
     let cachedMarket = globalThis.marketCache[bet.contractId];
     if (cachedMarket) {
       rating-=0.3; //slightly prefer markets I haven't seen before
-      if (cachedMarket.isResolved) rating-=5;
+      if (cachedMarket.isResolved){ rating-=5;}
+      if (cachedMarket.question.toLowerCase().includes(" stock")) {rating-=0.2;}
+      if (cachedMarket.question.includes(" 2030")) {rating-=0.2;}
     }
 
     return rating;
@@ -209,8 +211,7 @@ async function main() {
       bet._absAmount = Math.abs(bet.amount)
       bet._probAfter = roundTo2(bet.probAfter * 100);
       bet._probBefore = roundTo2(bet.probBefore * 100);
-      bet._movement = Math.abs(roundTo2((bet._probAfter - bet._probBefore) * 100))
-
+      bet._movement = Math.abs(roundTo2((bet.probAfter - bet.probBefore) * 100))
     }
     collectStats(bets);
 
@@ -223,10 +224,15 @@ async function main() {
     console.log("bets merged " + (newCount - bets.length));
 
 
+    // recalc value that could be changed from merging
     for (let bet of bets) {
       bet._movement = Math.abs(roundTo2((bet._probAfter - bet._probBefore) * 100))
       bet._probAfter = roundTo2(bet.probAfter * 100);
+      bet._isSold = bet.amount < 0;
       bet._absAmount = Math.abs(bet.amount)
+    }
+
+    for (let bet of bets) {
       bet._significance = rateBet(bet);
     }
 
