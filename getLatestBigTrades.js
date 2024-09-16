@@ -9,11 +9,12 @@ async function main() {
     "BhNkw088bMNwIFF2Aq5Gg9NTPzz1", "BgCeVUcOzkexeJpSPRNomWQaQaD3", "xB6IgHFizCHEJwqZ3un3", // acc, SemioticRivalry, mattyB
     "JlVpsgzLsbOUT4pajswVMr0ZzmM2", "EJQOCF3MfLTFYbhiKncrNefQDBz1", "sTUV8ejuM2byukNZp7qKP2OKXMx2"]; // joshua, chrisjbillington, NFL Unofficial
   let uninterestingMarkets = [
+    "WCsjjEUk1vxRy1wHNi63", // Eliezer UFO bet
     "GPQrtguru1sg9kGPg3i4", //China housing/real estate crisis by Sep 2024
     "z82v2ijIbM8AFL7jSIvm","GJJKNNWUw5lYK59EGDbT", // PEPE stock, Kizaru Stock
     "UQIVR5EPgi2JSmHoWB5C", "0oJucOh5KnlC6EM0oql2"]; // uefa-euro-cup-2024-tournament-prop
 
-  let interestingBetTreshold = 1.8;
+  let interestingBetTreshold = 1.7;
 
   // how significant or exploitable the bet is
   function rateBet(bet) {
@@ -34,12 +35,28 @@ async function main() {
     let cachedMarket = globalThis.marketCache[bet.contractId];
     if (cachedMarket) {
       rating-=0.3; //slightly prefer markets I haven't seen before
-      if (cachedMarket.isResolved){ rating-=5;}
-      if (cachedMarket.question.toLowerCase().includes(" stock")) {rating-=0.2;}
-      if (cachedMarket.question.includes(" 2030")) {rating-=0.2;}
+      rateBetBasedOnMarket(bet);
     }
-
     return rating;
+  }
+
+  function rateBetBasedOnMarket(bet) {
+    let cachedMarket = globalThis.marketCache[bet.contractId];
+    if (bet._wasRatedBasedOnMarket || !cachedMarket) {
+      return;
+    } else {
+      bet._wasRatedBasedOnMarket = true;
+    }
+    console.log("rateBetBasedOnMarket ", cachedMarket.question.toLowerCase() )
+    if (cachedMarket.isResolved){ bet._significance-=3;}
+    if (cachedMarket.question.toLowerCase().includes(" stock")) {bet._significance-=0.1;} // Stocks are boring
+    if (cachedMarket.question.includes(" 2030")) {bet._significance-=0.2;}
+     // Left-Wing or Right-Wing? Which person/character/concept will Manifold think are "Right-Wing" this week?"
+    if (cachedMarket.question.includes("Which person/character/concept will Manifold think")) {bet._significance-=2;}
+     // Spoilers
+    if (cachedMarket.groupSlugs?.includes("one-piece-stocks")) {bet._significance-=1;}
+    // large bets on sports markets are usually after the event was already decided
+    if (cachedMarket.groupSlugs?.some(groupslug=> ["sports-default","auto-racing"].includes(groupslug))) {bet._significance-=0.8;}
   }
 
   function output(...text) {
@@ -213,7 +230,7 @@ async function main() {
       bet._probBefore = roundTo2(bet.probBefore * 100);
       bet._movement = Math.abs(roundTo2((bet.probAfter - bet.probBefore) * 100))
     }
-    collectStats(bets);
+    //collectStats(bets);
 
     bets = bets.filter(bet => bet._absAmount !== 0);
     console.log("filtered out " + (betCount - bets.length) + " nothing bets")
@@ -237,16 +254,21 @@ async function main() {
     }
 
 
+    // preload Markets for the most noteworthy bets (in parallel for speed)
+    bets = bets.sort((a, b) => b._significance - a._significance);
+    const marketsToLoad = Array.from(new Set(bets.slice(0, 8+2).filter(bt => bt._significance > interestingBetTreshold).map(b =>b.contractId)))
+    await Promise.all(marketsToLoad.map(id=>loadMarket(id)));
+
+    bets.map(bet=>rateBetBasedOnMarket(bet));
     bets = bets.sort((a, b) => b._significance - a._significance);
 
     let mostSignificantBet = bets[0]; // biggest bet by _significance
 
     bets = bets.filter(bt => bt._significance > interestingBetTreshold)
 
-    collectStats(bets);
+    //collectStats(bets);
 
-    let topX = (betCount > 100 || bets.length >= 6) ? 5 : 3
-    if ((betCount == 1000 && bets.length >= 10) || bets.length >= 15) { topX = 8 };
+    let topX = Math.min(bets.length ,8);
 
     output("noteworthy bets count:", bets.length, "(out of " + betCount + " total)")
     if (bets.length == 0) {
@@ -258,9 +280,6 @@ async function main() {
     }
 
     bets = bets.slice(0, topX);
-    
-    const marketsToLoad = Array.from(new Set(bets.map(b =>b.contractId)))
-    await Promise.all(marketsToLoad.map(id=>loadMarket(id)));
     for (let bet of bets) {
       await outputBetAndMarketInfo(bet);
     }
