@@ -10,9 +10,9 @@ async function main() {
     "JlVpsgzLsbOUT4pajswVMr0ZzmM2", "EJQOCF3MfLTFYbhiKncrNefQDBz1", "sTUV8ejuM2byukNZp7qKP2OKXMx2"]; // joshua, chrisjbillington, NFL Unofficial
   let uninterestingMarkets = [
     "WCsjjEUk1vxRy1wHNi63", // Eliezer UFO bet
-    "GPQrtguru1sg9kGPg3i4", //China housing/real estate crisis by Sep 2024
-    "z82v2ijIbM8AFL7jSIvm","GJJKNNWUw5lYK59EGDbT", // PEPE stock, Kizaru Stock
-    "UQIVR5EPgi2JSmHoWB5C", "0oJucOh5KnlC6EM0oql2"]; // uefa-euro-cup-2024-tournament-prop
+    "GPQrtguru1sg9kGPg3i4" //China housing/real estate crisis by Sep 2024
+    ]; 
+  let uninterestingMarketGroups = ["sports-default","auto-racing","one-piece-stocks","stocks"]
 
   let interestingBetTreshold = 1.7;
 
@@ -51,12 +51,11 @@ async function main() {
     if (cachedMarket.isResolved){ bet._significance-=3;}
     if (cachedMarket.question.toLowerCase().includes(" stock")) {bet._significance-=0.1;} // Stocks are boring
     if (cachedMarket.question.includes(" 2030")) {bet._significance-=0.2;}
+    if (cachedMarket.uniqueBettorCount<= 5) {bet._significance-=0.5;}
+    if (cachedMarket.uniqueBettorCount<= 10) {bet._significance-=0.2;}
      // Left-Wing or Right-Wing? Which person/character/concept will Manifold think are "Right-Wing" this week?"
     if (cachedMarket.question.includes("Which person/character/concept will Manifold think")) {bet._significance-=2;}
-     // Spoilers
-    if (cachedMarket.groupSlugs?.includes("one-piece-stocks")) {bet._significance-=1;}
-    // large bets on sports markets are usually after the event was already decided
-    if (cachedMarket.groupSlugs?.some(groupslug=> ["sports-default","auto-racing"].includes(groupslug))) {bet._significance-=0.8;}
+    if (cachedMarket.groupSlugs?.some(groupslug=> uninterestingMarketGroups.includes(groupslug))) {bet._significance-=1;}
   }
 
   function output(...text) {
@@ -67,10 +66,6 @@ async function main() {
   }
   function outputLink(link, text) {
     outputNode('a', true, link, text)
-  }
-
-  function outputVerbose(...text) {
-    //TODO
   }
 
   function outputNode(node, bold, ...t) {
@@ -120,17 +115,6 @@ async function main() {
     console.log(JSON.stringify(stats, null, 2));
   }
 
-
-  function betToString(b) {
-    let bet = structuredClone(b);
-    for (str of ["fees", "isAnte", "id", "loanAmount", "isCancelled", // "createdTime","visibility",
-      //"isChallenge","isRedemption",
-      "userAvatarUrl", "isApi", "fills"
-    ]) {
-      delete bet[str];
-    }
-    return JSON.stringify(bet, null, 2);
-  }
   function roundTo2(num) { return Math.round(num * 100) / 100 }
 
   // merge consecutive bets regardless of user
@@ -272,7 +256,6 @@ async function main() {
 
     output("noteworthy bets count:", bets.length, "(out of " + betCount + " total)")
     if (bets.length == 0) {
-      output(betToString(mostSignificantBet));
       outputBold("only boring bets! most significant bet:")
       bets = [mostSignificantBet]
     } else {
@@ -283,7 +266,6 @@ async function main() {
     for (let bet of bets) {
       await outputBetAndMarketInfo(bet);
     }
-    //output(JSON.stringify(mostSignificantBet,null,2))
   } catch (e) {
     output(e);
     return;
