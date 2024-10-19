@@ -3,28 +3,27 @@ async function main() {
 
   // bots, sports-bettors, etc.
   let ignoreUsers = ["FDWTsTHFytZz96xmcKzf7S5asYL2", "qnIAzz9RamaodeiJSiGZO6xRGC63" // Yuna , Agh
-    ,"Iiok8KHMCRfUiwtMq1tl5PeDbA73", "EJQOCF3MfLTFYbhiKncrNefQDBz1"]; // Lion, Chris Billingto
+    ,"Iiok8KHMCRfUiwtMq1tl5PeDbA73", "EJQOCF3MfLTFYbhiKncrNefQDBz1"]; // Lion, chrisjbillington
   // users where you are less likely to benefit from correcting their trades (e.g. good users, news-traders, bots)
-  let lessInterestingUsers = ["ilJdhpLzZZSUgzueJOs2cbRnJn82", "SqOJYkeySMQjqP3UAypw6DxPx4Z2",// Botlab, Shump
+  let lessInterestingUsers = ["ilJdhpLzZZSUgzueJOs2cbRnJn82", // Botlab
     "BhNkw088bMNwIFF2Aq5Gg9NTPzz1", "BgCeVUcOzkexeJpSPRNomWQaQaD3", "xB6IgHFizCHEJwqZ3un3", // acc, SemioticRivalry, mattyB
-    "JlVpsgzLsbOUT4pajswVMr0ZzmM2", "EJQOCF3MfLTFYbhiKncrNefQDBz1", "sTUV8ejuM2byukNZp7qKP2OKXMx2"]; // joshua, chrisjbillington, NFL Unofficial
+    "JlVpsgzLsbOUT4pajswVMr0ZzmM2", "sTUV8ejuM2byukNZp7qKP2OKXMx2"]; // joshua, NFL Unofficial
   let uninterestingMarkets = [
-    "WCsjjEUk1vxRy1wHNi63", // Eliezer UFO bet
-    "GPQrtguru1sg9kGPg3i4" //China housing/real estate crisis by Sep 2024
+    "WCsjjEUk1vxRy1wHNi63" // Eliezer UFO bet
     ]; 
-  let uninterestingMarketGroups = ["sports-default","auto-racing","one-piece-stocks","stocks"]
+  let uninterestingMarketGroups = ["sports-default","sports-betting","auto-racing","one-piece-stocks","stocks"]
 
   let interestingBetTreshold = 1.7;
 
   // how significant or exploitable the bet is
   function rateBet(bet) {
     let rating = 0;
-    rating += Math.log10(bet._movement * 2 + 0.1)
-    rating += Math.log10(bet._absAmount / 10 + 0.1)
+    rating += Math.log10(bet._movement * 2 + 0.1);
+    rating += Math.log10(bet._absAmount / 10 + 0.1);
     if (uninterestingMarkets.includes(bet.contractId)) { rating -= 1.3; }
     if (lessInterestingUsers.includes(bet.userId)) { rating -= 0.5; }
     if (ignoreUsers.includes(bet.userId)) { rating -= 2; }
-    if (bet._unroundeProb === 0.5) { rating -= 2; } // likely the very first bet on a new market
+    if (bet._unroundedProb === 0.5) { rating -= 2; } // likely the very first bet on a new market
     if (bet.probAfter >= 98.8 || bet.probAfter <= 1.2) { rating -= .5; } // market probably decided already
     if (bet.probAfter > 98.5 || bet.probAfter < 1.5) { rating -= 1.5; } // market probably decided already
     if (bet._isSold && bet._absAmount > 100) { rating += 0.7; } // sells are more likely to be non-epistemic
@@ -92,7 +91,7 @@ async function main() {
       "amound < 50  ": bets.filter(x => (x._absAmount) < 50).length,
       "movement >=20": bets.filter(x => x._movement >= 20).length,
       "movement <= 1": bets.filter(x => x._movement <= 1).length,
-      "firstBet     ": bets.filter(x => x._unroundeProb === 0.5).length,
+      "firstBet     ": bets.filter(x => x._unroundedProb === 0.5).length,
       "isApi        ": bets.filter(x => x.isApi).length,
       "isSell       ": bets.filter(x => x._isSold).length,
       "isLimitOrder ": bets.filter(x => !x.isFilled).length,
@@ -200,6 +199,9 @@ async function main() {
     let bets = [];
     const response = await fetch("https://api.manifold.markets/v0/bets?order=desc&limit=" + betCount, { method: "GET" })
     bets = await response.json();
+    if (!Array.isArray(bets)) {
+      throw "Unknown API-Error";
+    }
 
     output("oldest   Bet:", new Date(bets[bets.length - 1].createdTime).toLocaleTimeString())
     output("youngest Bet:", new Date(bets[0].createdTime).toLocaleTimeString())
@@ -207,7 +209,7 @@ async function main() {
     for (let bet of bets) {
       // precalc some stuff 
       bet._isSold = bet.amount < 0;
-      bet._unroundeProb = bet.probBefore
+      bet._unroundedProb = bet.probBefore
       bet._ageInMinutes = Math.floor((new Date() - bet.createdTime) / 1000 / 60)
       bet._absAmount = Math.abs(bet.amount)
       bet._probAfter = roundTo2(bet.probAfter * 100);
