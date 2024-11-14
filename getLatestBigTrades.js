@@ -9,9 +9,11 @@ async function main() {
     "BhNkw088bMNwIFF2Aq5Gg9NTPzz1", "BgCeVUcOzkexeJpSPRNomWQaQaD3", "xB6IgHFizCHEJwqZ3un3", // acc, SemioticRivalry, mattyB
     "JlVpsgzLsbOUT4pajswVMr0ZzmM2", "sTUV8ejuM2byukNZp7qKP2OKXMx2"]; // joshua, NFL Unofficial
   let uninterestingMarkets = [
+    "y8thPELtPE", // why did democrate lose the election
+    "0y4cve16lz", // dwarkesh podcast
     "WCsjjEUk1vxRy1wHNi63" // Eliezer UFO bet
     ]; 
-  let uninterestingMarketGroups = ["sports-default","sports-betting","auto-racing","one-piece-stocks","stocks"]
+  let uninterestingMarketGroups = ["sports-default","sports-betting","nfl","auto-racing","one-piece-stocks","stocks"]
 
   let interestingBetTreshold = 1.7;
 
@@ -245,7 +247,7 @@ async function main() {
     const marketsToLoad = Array.from(new Set(bets.slice(0, 8+2).filter(bt => bt._significance > interestingBetTreshold).map(b =>b.contractId)))
     await Promise.all(marketsToLoad.map(id=>loadMarket(id)));
 
-    bets.map(bet=>rateBetBasedOnMarket(bet));
+    bets.forEach(bet=>rateBetBasedOnMarket(bet));
     bets = bets.sort((a, b) => b._significance - a._significance);
 
     let mostSignificantBet = bets[0]; // biggest bet by _significance
